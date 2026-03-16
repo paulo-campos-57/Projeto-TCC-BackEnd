@@ -1,5 +1,6 @@
 from flask import Flask
 from database import db
+from flask_cors import CORS
 from routes.user_routes import usuario_bp
 import os
 from dotenv import load_dotenv
@@ -9,6 +10,17 @@ load_dotenv()
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+        }
+    },
+)
 
 db.init_app(app)
 
