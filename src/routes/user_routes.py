@@ -38,7 +38,7 @@ def login():
                 {
                     'Message': 'Login bem-sucedido',
                     'User': {
-                        'id': usuario.id,
+                        'id': str(usuario.id),
                         'nome': usuario.nome,
                         'email': usuario.email,
                     },
