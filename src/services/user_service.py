@@ -4,6 +4,7 @@ from models.user import Usuario
 
 
 class UsuarioService:
+    # Criação de usuário
     @staticmethod
     def criar_usuario(nome, email, senha_plana):
         salt = bcrypt.gensalt()
@@ -17,6 +18,18 @@ class UsuarioService:
         db.session.commit()
         return novo_usuario
 
+    # Autenticação de usuário
+    @staticmethod
+    def autenticar_usuario(email, senha_plana):
+        usuario = Usuario.query.filter_by(email=email).first()
+
+        if bcrypt.checkpw(
+            senha_plana.encode("utf-8"), usuario.senha_hash.encode("utf-8")
+        ):
+            return usuario
+        return None
+
+    # Contar o número total de usuários
     @staticmethod
     def contar_usuarios():
         return Usuario.query.count()
