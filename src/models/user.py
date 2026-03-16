@@ -1,11 +1,18 @@
 from database import db
 import sqlalchemy as sa
 
-class Usuario(db.Model):
-    __tablename__ = 'user_table'
-    __table_args__ = {'schema': 'tpdbc'}
+from sqlalchemy.dialects.postgresql import UUID
 
-    id = db.Column(sa.Text, primary_key=True)
-    nome = db.Column(sa.String(100), nullable=False)
-    email = db.Column(sa.String(255), unique=True, nullable=False)
-    senha_hash = db.Column(sa.Text, nullable=False)
+
+class Usuario(db.Model):
+    __tablename__ = "user_table"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sa.text("gen_random_uuid()"),
+    )
+    nome = db.Column("user_name", db.String(100), nullable=False)
+    email = db.Column(db.String(250), unique=True, nullable=False)
+    senha_hash = db.Column("hash_pass", db.Text, nullable=False)
