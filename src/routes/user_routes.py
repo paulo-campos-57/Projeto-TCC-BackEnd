@@ -69,3 +69,11 @@ def login():
 @usuario_bp.route('/logout', methods=['POST'])
 def logout():
     return jsonify({'message': 'Logout bem-sucedido!'}), 200
+
+
+# Rota para excluir usuário por ID
+@usuario_bp.route('/delete/<string:usuario_id>', methods=['DELETE'])
+def delete_usuario(usuario_id):
+    if UsuarioService.excluir_usuario(usuario_id):
+        return jsonify({'message': 'Usuário excluído com sucesso!'}), 200
+    return jsonify({'error': 'Usuário não encontrado'}), 404

@@ -34,3 +34,13 @@ class UsuarioService:
     @staticmethod
     def contar_usuarios():
         return Usuario.query.count()
+
+    # Excluir usuário por ID
+    @staticmethod
+    def excluir_usuario(usuario_id):
+        usuario = Usuario.query.get(usuario_id)
+        if usuario:
+            db.session.delete(usuario)
+            db.session.commit()
+            return True
+        return False
