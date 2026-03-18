@@ -5,6 +5,7 @@ import jwt
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, request
 
+from models.user import Usuario
 from services.user_service import UsuarioService
 
 load_dotenv()
@@ -77,3 +78,42 @@ def delete_usuario(usuario_id):
     if UsuarioService.excluir_usuario(usuario_id):
         return jsonify({'message': 'Usuário excluído com sucesso!'}), 200
     return jsonify({'error': 'Usuário não encontrado'}), 404
+
+
+# Rota para obter dados do usuário logado
+@usuario_bp.route('/me', methods=['GET'])
+def get_user_logged():
+    token = request.headers.get('Authorization')
+
+    if not token:
+        return jsonify({'error': 'Token ausente'}), 401
+
+    try:
+        if 'Bearer ' in token:
+            token = token.split(' ')[1]
+
+        payload = jwt.decode(token, os.getenv('JWT_KEY'), algorithms=['HS256'])
+        usuario_id = payload['user_id']
+
+        usuario = Usuario.query.get(usuario_id)
+
+        if not usuario:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        return (
+            jsonify(
+                {
+                    'User': {
+                        'id': str(usuario.id),
+                        'nome': usuario.nome,
+                        'email': usuario.email,
+                    }
+                }
+            ),
+            200,
+        )
+
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401
