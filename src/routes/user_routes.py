@@ -117,3 +117,49 @@ def get_user_logged():
         return jsonify({'error': 'Token expirado'}), 401
     except jwt.InvalidTokenError:
         return jsonify({'error': 'Token inválido'}), 401
+
+
+# Rota para atualizar usuário
+@usuario_bp.route('/update_me', methods=['PUT'])
+def update_me():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'error': 'Token ausente'}), 401
+
+    try:
+        if 'Bearer ' in token:
+            token = token.split(' ')[1]
+        token = token.replace('"', '').strip()
+
+        payload = jwt.decode(token, os.getenv('JWT_KEY'), algorithms=['HS256'])
+        usuario_id = payload['user_id']
+
+        dados = request.get_json()
+
+        usuario_atualizado = UsuarioService.autalizar_usuario(
+            usuario_id, dados
+        )
+
+        if not usuario_atualizado:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        return (
+            jsonify(
+                {
+                    'Message': 'Perfil atualizado com sucesso!',
+                    'User': {
+                        'nome': usuario_atualizado.nome,
+                        'email': usuario_atualizado.email,
+                    },
+                }
+            ),
+            200,
+        )
+
+    except jwt.ExpiredSignatureError:
+        return (
+            jsonify({'error': 'Sessão expirada. Faça login novamente.'}),
+            401,
+        )
+    except Exception as e:
+        return jsonify({'error': f'Erro na autenticação: {str(e)}'}), 401

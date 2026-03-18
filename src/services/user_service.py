@@ -44,3 +44,23 @@ class UsuarioService:
             db.session.commit()
             return True
         return False
+
+    # Atualizar usuário por ID
+    @staticmethod
+    def autalizar_usuario(usuario_id, dados):
+        usuario = Usuario.query.get(usuario_id)
+
+        if not usuario:
+            return None
+
+        if 'nome' in dados:
+            usuario.nome = dados['nome']
+        if 'email' in dados:
+            usuario.email = dados['email']
+        if 'senha' in dados and dados['senha']:
+            salt = bcrypt.gensalt()
+            hash_senha = bcrypt.hashpw(dados['senha'].encode('utf-8'), salt)
+            usuario.senha_hash = hash_senha.decode('utf-8')
+
+        db.session.commit()
+        return usuario
