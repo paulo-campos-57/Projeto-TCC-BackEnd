@@ -41,6 +41,9 @@ def login():
 
     usuario = UsuarioService.autenticar_usuario(data['email'], data['senha'])
 
+    if not usuario:
+        return jsonify({'error': 'Credenciais inválidas'}), 401
+
     if usuario:
         payload = {
             'user_id': str(usuario.id),
@@ -75,6 +78,17 @@ def logout():
 # Rota para excluir usuário por ID
 @usuario_bp.route('/delete/<string:usuario_id>', methods=['DELETE'])
 def delete_usuario(usuario_id):
+    token_header = request.headers.get('Authorization')
+
+    try:
+        token = token_header.split(' ')[1].replace('"', '').strip()
+        payload = jwt.decode(token, os.getenv('JWT_KEY'), algorithms=['HS256'])
+
+        if payload['user_id'] != usuario_id:
+            return jsonify({'error': 'Ação não autorizada!'}), 403
+    except Exception as e:
+        return jsonify({'error': 'Token inválido', 'details': str(e)}), 401
+
     if UsuarioService.excluir_usuario(usuario_id):
         return jsonify({'message': 'Usuário excluído com sucesso!'}), 200
     return jsonify({'error': 'Usuário não encontrado'}), 404

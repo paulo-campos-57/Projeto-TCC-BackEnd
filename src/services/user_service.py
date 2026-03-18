@@ -21,13 +21,22 @@ class UsuarioService:
 
     # Autenticação de usuário
     @staticmethod
+    @staticmethod
     def autenticar_usuario(email, senha_plana):
         usuario = Usuario.query.filter_by(email=email).first()
 
-        if bcrypt.checkpw(
-            senha_plana.encode('utf-8'), usuario.senha_hash.encode('utf-8')
-        ):
-            return usuario
+        if not usuario:
+            return None
+
+        try:
+            if bcrypt.checkpw(
+                senha_plana.encode('utf-8'), usuario.senha_hash.encode('utf-8')
+            ):
+                return usuario
+        except Exception as e:
+            print(f'Erro técnico na verificação: {e}')
+            return None
+
         return None
 
     # Contar o número total de usuários
