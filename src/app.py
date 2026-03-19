@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from flask import Flask
 from flask_cors import CORS
+from routes.bairro_routes import bairro_bp
 from routes.user_routes import usuario_bp
 
 from database import db
@@ -27,7 +28,8 @@ CORS(
 
 db.init_app(app)
 
-app.register_blueprint(usuario_bp)
+app.register_blueprint(usuario_bp, url_prefix='/user')
+app.register_blueprint(bairro_bp, url_prefix='/bairro')
 
 with app.app_context():
     db.create_all()
