@@ -1,41 +1,33 @@
 import random
 
+from models.sessao_jogo import SessaoJogo
 from services.bairro_service import BairroService
 
 
 class JogoService:
     TOLERANCIA_PRECO = 3
-    CLIENTES_POR_DIA_MIN = 15
-    CLIENTES_POR_DIA_MAX = 40
+    CLIENTES_DIA_MIN = 15
+    CLIENTES_DIA_MAX = 40
 
     @staticmethod
-    def processar_dia(
-        id_bairro: int,
-        preco_tapioca: float,
-        estoque_disponivel: int,
-    ) -> dict:
-        bairro = BairroService.buscar_por_id(id_bairro)
+    def processar_dia(sessao: SessaoJogo) -> dict:
+        bairro = BairroService.buscar_por_id(sessao.id_bairro)
         if not bairro:
-            return {
-                'erro': 'Bairro nao encontrado.',
-                'lucro': 0,
-                'clientes_totais': 0,
-                'clientes_atendidos': 0,
-                'clientes_perdidos': 0,
-                'estoque_esgotado': False,
-                'satisfacao_delta': 0,
-                'mensagem': 'Bairro invalido.',
-            }
+            return {'erro': 'Bairro nao encontrado.'}
 
-        clientes_totais = JogoService._gerar_clientes_do_dia(
+        estoque_disponivel = sessao.tapiocas_possiveis()
+        if estoque_disponivel == 0:
+            return {'erro': 'Sem estoque para iniciar o dia.'}
+
+        clientes_totais = JogoService._gerar_clientes(
             bairro.preferencia_tapioca
         )
         satisfacao_delta = JogoService._calcular_satisfacao(
-            preco_tapioca, bairro.preferencia_preco
+            sessao.preco_tapioca, bairro.preferencia_preco
         )
-        taxa_desistencia = JogoService._taxa_desistencia(satisfacao_delta)
+        taxa = JogoService._taxa_desistencia(satisfacao_delta)
 
-        clientes_interessados = round(clientes_totais * (1 - taxa_desistencia))
+        clientes_interessados = round(clientes_totais * (1 - taxa))
         clientes_perdidos = clientes_totais - clientes_interessados
 
         estoque_esgotado = clientes_interessados > estoque_disponivel
@@ -43,7 +35,20 @@ class JogoService:
             estoque_disponivel if estoque_esgotado else clientes_interessados
         )
 
-        lucro = round(clientes_atendidos * preco_tapioca, 2)
+        for ing in sessao.estoque:
+            porcao_na_receita = sessao.receita.get(ing.nome, 0)
+            ing.quantidade = max(
+                0,
+                ing.quantidade - porcao_na_receita * clientes_atendidos,
+            )
+
+        lucro = round(clientes_atendidos * sessao.preco_tapioca, 2)
+
+        sessao.budget += lucro
+        sessao.satisfacao = max(
+            0, min(10, sessao.satisfacao + satisfacao_delta)
+        )
+
         mensagem = JogoService._gerar_mensagem(
             satisfacao_delta=satisfacao_delta,
             clientes_atendidos=clientes_atendidos,
@@ -60,14 +65,30 @@ class JogoService:
             'estoque_esgotado': estoque_esgotado,
             'satisfacao_delta': satisfacao_delta,
             'mensagem': mensagem,
+            'sessao': sessao.snapshot_publico(),
         }
 
     @staticmethod
-    def _gerar_clientes_do_dia(preferencia_tapioca: int) -> int:
+    def avancar_dia(sessao: SessaoJogo) -> None:
+        from models.ingrediente import Ingrediente
+
+        sessao.dia_atual += 1
+        sessao.gasto_hoje = 0.0
+        sessao.estoque = Ingrediente.estoque_inicial()
+        sessao.receita = {
+            'Goma de Tapioca': 1,
+            'Queijo Coalho': 0,
+            'Coco Ralado': 0,
+            'Leite Condensado': 0,
+        }
+        sessao.preco_tapioca = 15.0
+
+    @staticmethod
+    def _gerar_clientes(preferencia_tapioca: int) -> int:
         bonus = round(preferencia_tapioca * 1.5)
         return random.randint(
-            JogoService.CLIENTES_POR_DIA_MIN + bonus,
-            JogoService.CLIENTES_POR_DIA_MAX + bonus,
+            JogoService.CLIENTES_DIA_MIN + bonus,
+            JogoService.CLIENTES_DIA_MAX + bonus,
         )
 
     @staticmethod
@@ -80,8 +101,7 @@ class JogoService:
         sensibilidade = (6 - preferencia_preco) / 5
         if abs(diferenca) <= JogoService.TOLERANCIA_PRECO:
             return 0
-        penalidade_bruta = round(diferenca * sensibilidade)
-        return max(-10, min(10, -penalidade_bruta))
+        return max(-10, min(10, -round(diferenca * sensibilidade)))
 
     @staticmethod
     def _taxa_desistencia(satisfacao_delta: int) -> float:
@@ -111,7 +131,7 @@ class JogoService:
         else:
             partes.append(
                 f'Preco muito alto para {nome_bairro}. '
-                f'Muitos clientes foram embora.'
+                'Muitos clientes foram embora.'
             )
         partes.append(
             f'{clientes_atendidos} vendas realizadas'
