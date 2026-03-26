@@ -36,14 +36,12 @@ class JogoService:
         )
 
         for ing in sessao.estoque:
-            porcao_na_receita = sessao.receita.get(ing.nome, 0)
+            porcao = sessao.receita.get(ing.nome, 0)
             ing.quantidade = max(
-                0,
-                ing.quantidade - porcao_na_receita * clientes_atendidos,
+                0, ing.quantidade - porcao * clientes_atendidos
             )
 
         lucro = round(clientes_atendidos * sessao.preco_tapioca, 2)
-
         sessao.budget += lucro
         sessao.satisfacao = max(
             0, min(10, sessao.satisfacao + satisfacao_delta)
@@ -142,5 +140,8 @@ class JogoService:
             )
         )
         if estoque_esgotado:
-            partes.append('Estoque esgotado antes do fim do dia!')
+            partes.append(
+                'Estoque esgotado antes do fim do dia — '
+                'considere comprar mais ingredientes amanha!'
+            )
         return ' '.join(partes)
