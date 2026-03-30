@@ -68,11 +68,9 @@ class JogoService:
 
     @staticmethod
     def avancar_dia(sessao: SessaoJogo) -> None:
-        from models.ingrediente import Ingrediente
 
         sessao.dia_atual += 1
         sessao.gasto_hoje = 0.0
-        sessao.estoque = Ingrediente.estoque_inicial()
         sessao.receita = {
             'Goma de Tapioca': 1,
             'Queijo Coalho': 0,
