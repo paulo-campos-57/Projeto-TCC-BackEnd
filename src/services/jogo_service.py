@@ -176,22 +176,18 @@ class JogoService:
         if delta_preco > 0:
             partes.append(
                 f'Preco abaixo do esperado em {nome_bairro} '
-                f'(ideal: R$ {preco_ideal:.0f}) — clientes ficaram contentes.'
             )
         elif delta_preco == 0:
             partes.append(
                 f'Preco dentro do esperado para {nome_bairro} '
-                f'(ideal: R$ {preco_ideal:.0f}).'
             )
         elif delta_preco >= -3:
             partes.append(
                 f'Preco um pouco acima do esperado em {nome_bairro} '
-                f'(ideal: R$ {preco_ideal:.0f}).'
             )
         else:
             partes.append(
                 f'Preco muito acima do esperado em {nome_bairro} '
-                f'(ideal: R$ {preco_ideal:.0f}). Varios clientes foram embora.'
             )
 
         # feedback de receita
