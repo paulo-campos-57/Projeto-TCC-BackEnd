@@ -4,7 +4,7 @@ from database import db
 from models.user import Usuario
 
 
-class UsuarioService:
+class UserService:
     # Criação de usuário
     @staticmethod
     def criar_usuario(nome, email, senha_plana):
@@ -20,7 +20,6 @@ class UsuarioService:
         return novo_usuario
 
     # Autenticação de usuário
-    @staticmethod
     @staticmethod
     def autenticar_usuario(email, senha_plana):
         usuario = Usuario.query.filter_by(email=email).first()
@@ -43,6 +42,11 @@ class UsuarioService:
     @staticmethod
     def contar_usuarios():
         return Usuario.query.count()
+
+    # Obter usuário por ID
+    @staticmethod
+    def get_user_by_id(usuario_id):
+        return Usuario.query.get(usuario_id)
 
     # Excluir usuário por ID
     @staticmethod
