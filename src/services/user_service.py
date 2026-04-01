@@ -60,7 +60,7 @@ class UserService:
 
     # Atualizar usuário por ID
     @staticmethod
-    def autalizar_usuario(usuario_id, dados):
+    def atualizar_usuario(usuario_id, dados):
         usuario = Usuario.query.get(usuario_id)
 
         if not usuario:

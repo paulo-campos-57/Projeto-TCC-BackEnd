@@ -38,9 +38,9 @@ def get_user_logged():
 
 
 # atualização de usuário
-@usuario_bp.route('/update/<string:usuario_id>', methods=['PUT'])
-def update_usuario(usuario_id):
-    return UserController.update(usuario_id)
+@usuario_bp.route('/update_me', methods=['PUT'])
+def update_usuario():
+    return UserController.update()
 
 
 # exclusão de usuário
