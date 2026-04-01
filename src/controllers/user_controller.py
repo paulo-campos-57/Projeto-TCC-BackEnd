@@ -47,7 +47,11 @@ class UserController:
                 {
                     'Message': 'Login bem-sucedido',
                     'token': token,
-                    'User': {'nome': user.nome, 'email': user.email},
+                    'User': {
+                        'id': str(user.id),
+                        'nome': user.nome,
+                        'email': user.email,
+                    },
                 }
             ),
             200,
@@ -61,13 +65,23 @@ class UserController:
             return jsonify({'error': 'Usuário não encontrado'}), 404
 
         return (
-            jsonify({'User': {'nome': user.nome, 'email': user.email}}),
+            jsonify(
+                {
+                    'User': {
+                        'id': str(user.id),
+                        'nome': user.nome,
+                        'email': user.email,
+                    }
+                }
+            ),
             200,
         )
 
     @staticmethod
     @token_required
-    def delete(usuario_id):
+    def delete():
+        usuario_id = request.user_id
+
         if request.user_id != usuario_id:
             return jsonify({'error': 'Ação não autorizada!'}), 403
 

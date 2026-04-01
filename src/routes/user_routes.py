@@ -44,6 +44,6 @@ def update_usuario():
 
 
 # exclusão de usuário
-@usuario_bp.route('/delete/<string:usuario_id>', methods=['DELETE'])
-def delete_usuario(usuario_id):
-    return UserController.delete(usuario_id)
+@usuario_bp.route('/delete', methods=['DELETE'])
+def delete_usuario():
+    return UserController.delete()
