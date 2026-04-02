@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from decorators.auth import token_required
+from decorators.error_handler import handle_errors
 from flask import jsonify, request
 
 from services.user_service import UserService
@@ -10,23 +11,16 @@ from services.user_service import UserService
 
 class UserController:
     @staticmethod
+    @handle_errors
     def register():
-        try:
-            dados = request.json
-            usuario = UserService.criar_usuario(
-                dados['nome'], dados['email'], dados['senha']
-            )
-            return (
-                jsonify({'message': 'Usuário criado!', 'id': usuario.id}),
-                201,
-            )
-        except Exception as e:
-            return (
-                jsonify({'error': 'Erro ao criar usuário', 'details': str(e)}),
-                500,
-            )
+        dados = request.json
+        usuario = UserService.criar_usuario(
+            dados['nome'], dados['email'], dados['senha']
+        )
+        return jsonify({'message': 'Usuário criado!', 'id': usuario.id}), 201
 
     @staticmethod
+    @handle_errors
     def login():
         data = request.get_json()
         if not data or not data.get('email') or not data.get('senha'):
@@ -59,6 +53,7 @@ class UserController:
 
     @staticmethod
     @token_required
+    @handle_errors
     def get_me():
         user = UserService.get_user_by_id(request.user_id)
         if not user:
@@ -79,21 +74,18 @@ class UserController:
 
     @staticmethod
     @token_required
+    @handle_errors
     def delete():
         usuario_id = request.user_id
-
-        if request.user_id != usuario_id:
-            return jsonify({'error': 'Ação não autorizada!'}), 403
-
         if UserService.excluir_usuario(usuario_id):
             return jsonify({'message': 'Usuário excluído com sucesso!'}), 200
         return jsonify({'error': 'Usuário não encontrado'}), 404
 
     @staticmethod
     @token_required
+    @handle_errors
     def update():
         usuario_id = request.user_id
-
         dados = request.get_json()
         user = UserService.atualizar_usuario(usuario_id, dados)
 
