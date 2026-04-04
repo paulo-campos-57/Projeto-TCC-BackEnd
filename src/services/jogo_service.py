@@ -12,7 +12,7 @@ class JogoService:
     CLIENTES_DIA_MAX = 40
 
     # Pesos de cada componente na satisfacao final do dia
-    PESO_PRECO = 0.4
+    PESO_PRECO = 0.5
     PESO_RECEITA = 0.6
 
     BONUS_CLIENTES_POR_SAT = 2
@@ -87,6 +87,7 @@ class JogoService:
 
     @staticmethod
     def avancar_dia(sessao: SessaoJogo) -> None:
+        sessao.preco_dia_anterior = sessao.preco_tapioca
         sessao.dia_atual += 1
         sessao.gasto_hoje = 0.0
         sessao.receita = {

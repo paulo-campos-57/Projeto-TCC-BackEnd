@@ -15,6 +15,7 @@ class SessaoJogo:
     estoque: list[Ingrediente] = field(default_factory=list)
     receita: dict[str, int] = field(default_factory=dict)
     preco_tapioca: float = 15.0
+    preco_dia_anterior: float | None = None
     gasto_hoje: float = 0.0
     finalizado: bool = False
 
@@ -91,6 +92,7 @@ class SessaoJogo:
             'budget': round(self.budget, 2),
             'satisfacao': self.satisfacao,
             'preco_tapioca': self.preco_tapioca,
+            'preco_dia_anterior': self.preco_dia_anterior,
             'gasto_hoje': round(self.gasto_hoje, 2),
             'tapiocas_possiveis': self.tapiocas_possiveis(),
             'estoque': self.estoque_para_cliente(),
