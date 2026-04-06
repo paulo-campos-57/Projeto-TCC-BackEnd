@@ -6,16 +6,22 @@ from services.bairro_service import BairroService
 
 
 class JogoService:
-    # Tolerancia de preco sem penalidade de satisfacao
+    # Tolerancia de preco
     TOLERANCIA_PRECO = 2
+
+    # Limites de demanda diaria
     CLIENTES_DIA_MIN = 15
     CLIENTES_DIA_MAX = 40
 
-    # Pesos de cada componente na satisfacao final do dia
-    PESO_PRECO = 0.5
+    # Pesos de de preco e receita
+    PESO_PRECO = 0.4
     PESO_RECEITA = 0.6
 
+    # Bonus de clientes por ponto de satisfacao
     BONUS_CLIENTES_POR_SAT = 2
+
+    # Elasticidade do preco
+    ELASTICIDADE_PRECO = 0.7
 
     @staticmethod
     def processar_dia(sessao: SessaoJogo) -> dict:
@@ -27,9 +33,13 @@ class JogoService:
         if estoque_disponivel == 0:
             return {'erro': 'Sem estoque para iniciar o dia.'}
 
+        preco_ideal = Ingrediente.preco_ideal(bairro.nome)
+
         clientes_totais = JogoService._gerar_clientes(
-            bairro.preferencia_tapioca,
-            sessao.satisfacao,
+            preferencia_tapioca=bairro.preferencia_tapioca,
+            satisfacao_atual=sessao.satisfacao,
+            preco_jogador=sessao.preco_tapioca,
+            preco_ideal=preco_ideal,
         )
 
         delta_preco = JogoService._delta_preco(
@@ -40,9 +50,15 @@ class JogoService:
             delta_preco, delta_receita
         )
 
-        taxa = JogoService._taxa_desistencia(satisfacao_delta)
-        clientes_interessados = round(clientes_totais * (1 - taxa))
-        clientes_perdidos = clientes_totais - clientes_interessados
+        taxa_preco, taxa_receita = JogoService._taxas_desistencia(
+            delta_preco, delta_receita
+        )
+        taxa_total = min(0.9, taxa_preco + taxa_receita)
+
+        clientes_perdidos_preco = round(clientes_totais * taxa_preco)
+        clientes_perdidos_receita = round(clientes_totais * taxa_receita)
+        clientes_perdidos_total = round(clientes_totais * taxa_total)
+        clientes_interessados = clientes_totais - clientes_perdidos_total
 
         estoque_esgotado = clientes_interessados > estoque_disponivel
         clientes_atendidos = (
@@ -66,17 +82,20 @@ class JogoService:
             delta_receita=delta_receita,
             satisfacao_delta=satisfacao_delta,
             clientes_atendidos=clientes_atendidos,
-            clientes_perdidos=clientes_perdidos,
+            clientes_perdidos_preco=clientes_perdidos_preco,
+            clientes_perdidos_receita=clientes_perdidos_receita,
             estoque_esgotado=estoque_esgotado,
             nome_bairro=bairro.nome,
-            preco_ideal=Ingrediente.preco_ideal(bairro.nome),
+            dia_atual=sessao.dia_atual,
         )
 
         return {
             'lucro': lucro,
             'clientes_totais': clientes_totais,
             'clientes_atendidos': clientes_atendidos,
-            'clientes_perdidos': clientes_perdidos,
+            'clientes_perdidos': clientes_perdidos_total,
+            'clientes_perdidos_preco': clientes_perdidos_preco,
+            'clientes_perdidos_receita': clientes_perdidos_receita,
             'estoque_esgotado': estoque_esgotado,
             'satisfacao_delta': satisfacao_delta,
             'delta_preco': delta_preco,
@@ -100,15 +119,30 @@ class JogoService:
 
     @staticmethod
     def _gerar_clientes(
-        preferencia_tapioca: int, satisfacao_atual: int
+        preferencia_tapioca: int,
+        satisfacao_atual: int,
+        preco_jogador: float,
+        preco_ideal: float,
     ) -> int:
+        ratio = preco_ideal / max(preco_jogador, 1.0)
+        fator_preco = min(
+            1.5, max(0.2, ratio**JogoService.ELASTICIDADE_PRECO)
+        )
+
         bonus_tapioca = round(preferencia_tapioca * 1.5)
         bonus_sat = (satisfacao_atual - 5) * JogoService.BONUS_CLIENTES_POR_SAT
+
         base_min = max(
-            5, JogoService.CLIENTES_DIA_MIN + bonus_tapioca + bonus_sat
+            5,
+            round(JogoService.CLIENTES_DIA_MIN * fator_preco)
+            + bonus_tapioca
+            + bonus_sat,
         )
         base_max = max(
-            10, JogoService.CLIENTES_DIA_MAX + bonus_tapioca + bonus_sat
+            10,
+            round(JogoService.CLIENTES_DIA_MAX * fator_preco)
+            + bonus_tapioca
+            + bonus_sat,
         )
         return random.randint(base_min, base_max)
 
@@ -123,7 +157,11 @@ class JogoService:
         if diferenca > 0:
             raw = -round(diferenca * 0.5)
         else:
-            raw = round(abs(diferenca) * 0.3)
+            pct_abaixo = abs(diferenca) / ideal
+            if pct_abaixo <= 0.30:
+                raw = round(abs(diferenca) * 0.3)
+            else:
+                raw = round(3 - (pct_abaixo - 0.30) * 10)
 
         return max(-5, min(5, raw))
 
@@ -142,7 +180,6 @@ class JogoService:
         )
 
         normalizado = min(1.0, distancia / (total_ideal * 2))
-
         delta = round(5 * (1 - 2 * normalizado))
         return max(-5, min(5, delta))
 
@@ -155,10 +192,16 @@ class JogoService:
         return max(-10, min(10, round(combinado * 2)))
 
     @staticmethod
-    def _taxa_desistencia(satisfacao_delta: int) -> float:
-        if satisfacao_delta >= 0:
-            return 0.0
-        return min(0.8, abs(satisfacao_delta) * 0.06)
+    def _taxas_desistencia(
+        delta_preco: int, delta_receita: int
+    ) -> tuple[float, float]:
+        taxa_preco = (
+            0.0 if delta_preco >= 0 else min(0.5, abs(delta_preco) * 0.06)
+        )
+        taxa_receita = (
+            0.0 if delta_receita >= 0 else min(0.5, abs(delta_receita) * 0.04)
+        )
+        return taxa_preco, taxa_receita
 
     @staticmethod
     def _gerar_mensagem(
@@ -166,26 +209,33 @@ class JogoService:
         delta_receita: int,
         satisfacao_delta: int,
         clientes_atendidos: int,
-        clientes_perdidos: int,
+        clientes_perdidos_preco: int,
+        clientes_perdidos_receita: int,
         estoque_esgotado: bool,
         nome_bairro: str,
-        preco_ideal: float,
+        dia_atual: int,
     ) -> str:
         partes = []
 
-        # feedback de preco
-        if delta_preco > 0:
-            partes.append(f'Preco abaixo do esperado em {nome_bairro} ')
-        elif delta_preco == 0:
-            partes.append(f'Preco dentro do esperado para {nome_bairro} ')
+        if delta_preco >= 2:
+            partes.append(f'Preco abaixo do esperado em {nome_bairro}.')
+        elif delta_preco == 0 or delta_preco == 1:
+            partes.append(f'Preco dentro do esperado para {nome_bairro}.')
+        elif delta_preco == -1:
+            partes.append(
+                f'Preco muito abaixo do esperado em {nome_bairro} '
+                f'produto pareceu de baixa qualidade.'
+            )
         elif delta_preco >= -3:
             partes.append(
                 f'Preco um pouco acima do esperado em {nome_bairro} '
             )
         else:
-            partes.append(f'Preco muito acima do esperado em {nome_bairro} ')
+            partes.append(
+                f'Preco muito acima do esperado em {nome_bairro} '
+                f'Varios clientes foram embora.'
+            )
 
-        # feedback de receita
         if delta_receita >= 4:
             partes.append('A receita foi exatamente o que o bairro queria!')
         elif delta_receita >= 1:
@@ -198,15 +248,21 @@ class JogoService:
                 'experimente os ingredientes sugeridos amanha.'
             )
 
-        # resultado do dia
-        partes.append(
-            f'{clientes_atendidos} vendas realizadas'
-            + (
-                f', {clientes_perdidos} desistiram.'
-                if clientes_perdidos
-                else '.'
+        partes.append(f'{clientes_atendidos} vendas realizadas.')
+
+        if clientes_perdidos_preco > 0:
+            partes.append(f'{clientes_perdidos_preco} desistiram pelo preco.')
+        if clientes_perdidos_receita > 0:
+            partes.append(
+                f'{clientes_perdidos_receita} nao gostaram da receita.'
             )
-        )
+
+        fator = Ingrediente.fator_inflacao(dia_atual)
+        if fator > 1.0:
+            partes.append(
+                f'Lembre-se: os insumos estao {round((fator - 1) * 100):.0f}% '
+                f'mais caros do que no inicio do jogo.'
+            )
 
         if estoque_esgotado:
             partes.append(

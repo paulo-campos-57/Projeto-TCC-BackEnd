@@ -5,15 +5,19 @@ from typing import ClassVar
 @dataclass
 class Ingrediente:
     nome: str
-    preco_unitario: float
+    preco_base: float
     porcao: int
     quantidade: int = 0
 
+    @property
+    def preco_total(self) -> float:
+        return self.preco_base
+
     CATALOGO: ClassVar[list[dict]] = [
-        {'nome': 'Goma de Tapioca', 'preco_unitario': 10, 'porcao': 5},
-        {'nome': 'Queijo Coalho', 'preco_unitario': 15, 'porcao': 3},
-        {'nome': 'Coco Ralado', 'preco_unitario': 8, 'porcao': 4},
-        {'nome': 'Leite Condensado', 'preco_unitario': 12, 'porcao': 5},
+        {'nome': 'Goma de Tapioca', 'preco_base': 10, 'porcao': 5},
+        {'nome': 'Queijo Coalho', 'preco_base': 15, 'porcao': 3},
+        {'nome': 'Coco Ralado', 'preco_base': 8, 'porcao': 4},
+        {'nome': 'Leite Condensado', 'preco_base': 12, 'porcao': 5},
     ]
 
     RECEITAS_IDEAIS: ClassVar[dict[str, dict[str, int]]] = {
@@ -64,6 +68,19 @@ class Ingrediente:
         'Areias': 10.0,
     }
 
+    # Inflação
+    @staticmethod
+    def fator_inflacao(dia_atual: int) -> float:
+        return 1.0 + (dia_atual // 5) * 0.10
+
+    @classmethod
+    def preco_com_inflacao(cls, nome: str, dia_atual: int) -> float:
+        item = next((i for i in cls.CATALOGO if i['nome'] == nome), None)
+        if item is None:
+            return 0.0
+        return round(item['preco_base'] * cls.fator_inflacao(dia_atual), 2)
+
+    # Consultas
     @classmethod
     def receita_ideal(cls, nome_bairro: str) -> dict[str, int]:
         return cls.RECEITAS_IDEAIS.get(
@@ -81,11 +98,12 @@ class Ingrediente:
         return cls.PRECOS_IDEAIS.get(nome_bairro, 15.0)
 
     @classmethod
-    def catalogo_para_cliente(cls) -> list[dict]:
+    def catalogo_para_cliente(cls, dia_atual: int = 1) -> list[dict]:
+        fator = cls.fator_inflacao(dia_atual)
         return [
             {
                 'nome': i['nome'],
-                'preco': i['preco_unitario'],
+                'preco': round(i['preco_base'] * fator, 2),
                 'porcao': i['porcao'],
             }
             for i in cls.CATALOGO

@@ -31,7 +31,9 @@ class JogoController:
                 {
                     'sessao_id': sessao.sessao_id,
                     'sessao': sessao.snapshot_publico(),
-                    'catalogo': Ingrediente.catalogo_para_cliente(),
+                    'catalogo': Ingrediente.catalogo_para_cliente(
+                        sessao.dia_atual
+                    ),
                 }
             ),
             201,
@@ -58,9 +60,8 @@ class JogoController:
             return jsonify({'erro': "'nome' do ingrediente obrigatorio."}), 400
 
         resultado = sessao.comprar_ingrediente(nome)
-        if not resultado['ok']:
-            return jsonify(resultado), 422
-        return jsonify(resultado), 200
+        status = 200 if resultado.get('ok') else 422
+        return jsonify(resultado), status
 
     @staticmethod
     @handle_errors
@@ -75,9 +76,8 @@ class JogoController:
             return jsonify({'erro': "'nome' do ingrediente obrigatorio."}), 400
 
         resultado = sessao.devolver_ingrediente(nome)
-        if not resultado['ok']:
-            return jsonify(resultado), 422
-        return jsonify(resultado), 200
+        status = 200 if resultado.get('ok') else 422
+        return jsonify(resultado), status
 
     @staticmethod
     @handle_errors
@@ -98,9 +98,8 @@ class JogoController:
         resultado = sessao.atualizar_receita(
             {k: int(v) for k, v in data.items()}
         )
-        if not resultado['ok']:
-            return jsonify(resultado), 422
-        return jsonify(resultado), 200
+        status = 200 if resultado.get('ok') else 422
+        return jsonify(resultado), status
 
     @staticmethod
     @handle_errors
@@ -115,9 +114,8 @@ class JogoController:
             return jsonify({'erro': "'preco_tapioca' obrigatorio."}), 400
 
         resultado = sessao.definir_preco(float(valor))
-        if not resultado['ok']:
-            return jsonify(resultado), 422
-        return jsonify(resultado), 200
+        status = 200 if resultado.get('ok') else 422
+        return jsonify(resultado), status
 
     @staticmethod
     @handle_errors
@@ -147,7 +145,9 @@ class JogoController:
             jsonify(
                 {
                     'sessao': sessao.snapshot_publico(),
-                    'catalogo': Ingrediente.catalogo_para_cliente(),
+                    'catalogo': Ingrediente.catalogo_para_cliente(
+                        sessao.dia_atual
+                    ),
                 }
             ),
             200,
@@ -156,8 +156,7 @@ class JogoController:
     @staticmethod
     @handle_errors
     def encerrar(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
+        if not obter_sessao(sessao_id):
             return jsonify({'erro': 'Sessao nao encontrada.'}), 404
         remover_sessao(sessao_id)
         return jsonify({'mensagem': 'Sessao encerrada.'}), 200

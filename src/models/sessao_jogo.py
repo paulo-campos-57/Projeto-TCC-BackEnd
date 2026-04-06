@@ -11,7 +11,7 @@ class SessaoJogo:
     tempo_de_jogo: str
     dia_atual: int = 1
     budget: float = 100.0
-    satisfacao: int = 5
+    satisfacao: int = 5  # 0-10
     estoque: list[Ingrediente] = field(default_factory=list)
     receita: dict[str, int] = field(default_factory=dict)
     preco_tapioca: float = 15.0
@@ -37,12 +37,14 @@ class SessaoJogo:
         ing = next((i for i in self.estoque if i.nome == nome), None)
         if ing is None:
             return {'ok': False, 'erro': 'Ingrediente nao encontrado.'}
-        if self.budget < ing.preco_unitario:
+
+        preco_real = Ingrediente.preco_com_inflacao(nome, self.dia_atual)
+        if self.budget < preco_real:
             return {'ok': False, 'erro': 'Saldo insuficiente.'}
 
         ing.quantidade += ing.porcao
-        self.budget -= ing.preco_unitario
-        self.gasto_hoje += ing.preco_unitario
+        self.budget -= preco_real
+        self.gasto_hoje += preco_real
         return {
             'ok': True,
             'nome': ing.nome,
@@ -61,9 +63,10 @@ class SessaoJogo:
                 'erro': 'Estoque insuficiente para devolucao.',
             }
 
+        preco_real = Ingrediente.preco_com_inflacao(nome, self.dia_atual)
         ing.quantidade -= ing.porcao
-        self.budget += ing.preco_unitario
-        self.gasto_hoje -= ing.preco_unitario
+        self.budget += preco_real
+        self.gasto_hoje -= preco_real
         return {
             'ok': True,
             'nome': ing.nome,
@@ -86,6 +89,7 @@ class SessaoJogo:
         return {'ok': True}
 
     def snapshot_publico(self) -> dict:
+        fator = Ingrediente.fator_inflacao(self.dia_atual)
         return {
             'sessao_id': self.sessao_id,
             'dia_atual': self.dia_atual,
@@ -98,6 +102,7 @@ class SessaoJogo:
             'estoque': self.estoque_para_cliente(),
             'receita': dict(self.receita),
             'finalizado': self.finalizado,
+            'fator_inflacao': round(fator, 2),
         }
 
 
