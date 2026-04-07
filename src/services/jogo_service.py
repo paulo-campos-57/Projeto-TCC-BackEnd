@@ -6,32 +6,27 @@ from services.bairro_service import BairroService
 
 
 class JogoService:
-    # Tolerancia de preco
     TOLERANCIA_PRECO = 2
 
-    # Limites de demanda diaria
     CLIENTES_DIA_MIN = 15
     CLIENTES_DIA_MAX = 40
 
-    # Pesos de de preco e receita
     PESO_PRECO = 0.4
     PESO_RECEITA = 0.6
 
-    # Bonus de clientes por ponto de satisfacao
     BONUS_CLIENTES_POR_SAT = 2
 
-    # Elasticidade do preco
     ELASTICIDADE_PRECO = 0.7
 
     @staticmethod
     def processar_dia(sessao: SessaoJogo) -> dict:
         bairro = BairroService.buscar_por_id(sessao.id_bairro)
         if not bairro:
-            return {'erro': 'Bairro nao encontrado.'}
+            return {"erro": "Bairro nao encontrado."}
 
         estoque_disponivel = sessao.tapiocas_possiveis()
         if estoque_disponivel == 0:
-            return {'erro': 'Sem estoque para iniciar o dia.'}
+            return {"erro": "Sem estoque para iniciar o dia."}
 
         preco_ideal = Ingrediente.preco_ideal(bairro.nome)
 
@@ -42,13 +37,9 @@ class JogoService:
             preco_ideal=preco_ideal,
         )
 
-        delta_preco = JogoService._delta_preco(
-            sessao.preco_tapioca, bairro.nome
-        )
+        delta_preco = JogoService._delta_preco(sessao.preco_tapioca, bairro.nome)
         delta_receita = JogoService._delta_receita(sessao.receita, bairro.nome)
-        satisfacao_delta = JogoService._combinar_deltas(
-            delta_preco, delta_receita
-        )
+        satisfacao_delta = JogoService._combinar_deltas(delta_preco, delta_receita)
 
         taxa_preco, taxa_receita = JogoService._taxas_desistencia(
             delta_preco, delta_receita
@@ -67,15 +58,11 @@ class JogoService:
 
         for ing in sessao.estoque:
             porcao = sessao.receita.get(ing.nome, 0)
-            ing.quantidade = max(
-                0, ing.quantidade - porcao * clientes_atendidos
-            )
+            ing.quantidade = max(0, ing.quantidade - porcao * clientes_atendidos)
 
         lucro = round(clientes_atendidos * sessao.preco_tapioca, 2)
         sessao.budget += lucro
-        sessao.satisfacao = max(
-            0, min(10, sessao.satisfacao + satisfacao_delta)
-        )
+        sessao.satisfacao = max(0, min(10, sessao.satisfacao + satisfacao_delta))
 
         mensagem = JogoService._gerar_mensagem(
             delta_preco=delta_preco,
@@ -86,22 +73,23 @@ class JogoService:
             clientes_perdidos_receita=clientes_perdidos_receita,
             estoque_esgotado=estoque_esgotado,
             nome_bairro=bairro.nome,
+            preco_ideal=preco_ideal,
             dia_atual=sessao.dia_atual,
         )
 
         return {
-            'lucro': lucro,
-            'clientes_totais': clientes_totais,
-            'clientes_atendidos': clientes_atendidos,
-            'clientes_perdidos': clientes_perdidos_total,
-            'clientes_perdidos_preco': clientes_perdidos_preco,
-            'clientes_perdidos_receita': clientes_perdidos_receita,
-            'estoque_esgotado': estoque_esgotado,
-            'satisfacao_delta': satisfacao_delta,
-            'delta_preco': delta_preco,
-            'delta_receita': delta_receita,
-            'mensagem': mensagem,
-            'sessao': sessao.snapshot_publico(),
+            "lucro": lucro,
+            "clientes_totais": clientes_totais,
+            "clientes_atendidos": clientes_atendidos,
+            "clientes_perdidos": clientes_perdidos_total,
+            "clientes_perdidos_preco": clientes_perdidos_preco,
+            "clientes_perdidos_receita": clientes_perdidos_receita,
+            "estoque_esgotado": estoque_esgotado,
+            "satisfacao_delta": satisfacao_delta,
+            "delta_preco": delta_preco,
+            "delta_receita": delta_receita,
+            "mensagem": mensagem,
+            "sessao": sessao.snapshot_publico(),
         }
 
     @staticmethod
@@ -110,10 +98,10 @@ class JogoService:
         sessao.dia_atual += 1
         sessao.gasto_hoje = 0.0
         sessao.receita = {
-            'Goma de Tapioca': 1,
-            'Queijo Coalho': 0,
-            'Coco Ralado': 0,
-            'Leite Condensado': 0,
+            "Goma de Tapioca": 1,
+            "Queijo Coalho": 0,
+            "Coco Ralado": 0,
+            "Leite Condensado": 0,
         }
         sessao.preco_tapioca = 15.0
 
@@ -125,9 +113,7 @@ class JogoService:
         preco_ideal: float,
     ) -> int:
         ratio = preco_ideal / max(preco_jogador, 1.0)
-        fator_preco = min(
-            1.5, max(0.2, ratio**JogoService.ELASTICIDADE_PRECO)
-        )
+        fator_preco = min(1.5, max(0.2, ratio**JogoService.ELASTICIDADE_PRECO))
 
         bonus_tapioca = round(preferencia_tapioca * 1.5)
         bonus_sat = (satisfacao_atual - 5) * JogoService.BONUS_CLIENTES_POR_SAT
@@ -166,9 +152,7 @@ class JogoService:
         return max(-5, min(5, raw))
 
     @staticmethod
-    def _delta_receita(
-        receita_jogador: dict[str, int], nome_bairro: str
-    ) -> int:
+    def _delta_receita(receita_jogador: dict[str, int], nome_bairro: str) -> int:
         ideal = Ingrediente.receita_ideal(nome_bairro)
         ingredientes = list(ideal.keys())
 
@@ -192,12 +176,8 @@ class JogoService:
         return max(-10, min(10, round(combinado * 2)))
 
     @staticmethod
-    def _taxas_desistencia(
-        delta_preco: int, delta_receita: int
-    ) -> tuple[float, float]:
-        taxa_preco = (
-            0.0 if delta_preco >= 0 else min(0.5, abs(delta_preco) * 0.06)
-        )
+    def _taxas_desistencia(delta_preco: int, delta_receita: int) -> tuple[float, float]:
+        taxa_preco = 0.0 if delta_preco >= 0 else min(0.5, abs(delta_preco) * 0.06)
         taxa_receita = (
             0.0 if delta_receita >= 0 else min(0.5, abs(delta_receita) * 0.04)
         )
@@ -213,61 +193,64 @@ class JogoService:
         clientes_perdidos_receita: int,
         estoque_esgotado: bool,
         nome_bairro: str,
+        preco_ideal: float,
         dia_atual: int,
     ) -> str:
         partes = []
 
         if delta_preco >= 2:
-            partes.append(f'Preco abaixo do esperado em {nome_bairro}.')
-        elif delta_preco == 0 or delta_preco == 1:
-            partes.append(f'Preco dentro do esperado para {nome_bairro}.')
-        elif delta_preco == -1:
             partes.append(
-                f'Preco muito abaixo do esperado em {nome_bairro} '
-                f'produto pareceu de baixa qualidade.'
+                f"Preco bem recebido pelos clientes de {nome_bairro} "
+                f"— muitos compraram!"
             )
-        elif delta_preco >= -3:
+        elif delta_preco == 0 or delta_preco == 1:
+            partes.append(f"Preco dentro do esperado para o perfil de {nome_bairro}.")
+        elif delta_preco <= -4:
             partes.append(
-                f'Preco um pouco acima do esperado em {nome_bairro} '
+                f"Preco muito acima do esperado em {nome_bairro}. "
+                f"Varios clientes foram embora."
+            )
+        elif delta_preco <= -2:
+            partes.append(
+                f"Preco um pouco acima do que os clientes de {nome_bairro} "
+                f"costumam pagar."
             )
         else:
             partes.append(
-                f'Preco muito acima do esperado em {nome_bairro} '
-                f'Varios clientes foram embora.'
+                f"Preco muito abaixo do que o bairro de {nome_bairro} valoriza "
+                f"— o produto pareceu de baixa qualidade."
             )
 
         if delta_receita >= 4:
-            partes.append('A receita foi exatamente o que o bairro queria!')
+            partes.append("A receita foi exatamente o que o bairro queria!")
         elif delta_receita >= 1:
-            partes.append('A receita foi bem recebida pelo bairro.')
+            partes.append("A receita foi bem recebida pelo bairro.")
         elif delta_receita == 0:
-            partes.append('A receita esta proxima do gosto do bairro.')
+            partes.append("A receita esta proxima do gosto do bairro.")
         else:
             partes.append(
-                'A receita nao combinou muito com o perfil do bairro — '
-                'experimente os ingredientes sugeridos amanha.'
+                "A receita nao combinou muito com o perfil do bairro — "
+                "experimente os ingredientes sugeridos amanha."
             )
 
-        partes.append(f'{clientes_atendidos} vendas realizadas.')
+        partes.append(f"{clientes_atendidos} vendas realizadas.")
 
         if clientes_perdidos_preco > 0:
-            partes.append(f'{clientes_perdidos_preco} desistiram pelo preco.')
+            partes.append(f"{clientes_perdidos_preco} desistiram pelo preco.")
         if clientes_perdidos_receita > 0:
-            partes.append(
-                f'{clientes_perdidos_receita} nao gostaram da receita.'
-            )
+            partes.append(f"{clientes_perdidos_receita} nao gostaram da receita.")
 
         fator = Ingrediente.fator_inflacao(dia_atual)
         if fator > 1.0:
             partes.append(
-                f'Lembre-se: os insumos estao {round((fator - 1) * 100):.0f}% '
-                f'mais caros do que no inicio do jogo.'
+                f"Lembre-se: os insumos estao {round((fator - 1) * 100):.0f}% "
+                f"mais caros do que no inicio do jogo."
             )
 
         if estoque_esgotado:
             partes.append(
-                'Estoque esgotado antes do fim do dia — '
-                'considere comprar mais ingredientes amanha!'
+                "Estoque esgotado antes do fim do dia — "
+                "considere comprar mais ingredientes amanha!"
             )
 
-        return ' '.join(partes)
+        return " ".join(partes)
