@@ -19,6 +19,15 @@ class SessaoJogo:
     gasto_hoje: float = 0.0
     finalizado: bool = False
 
+    user_id: str | None = None
+    faturamento_total: float = 0.0
+    gasto_total: float = 0.0
+    satisfacao_historico: list = None
+
+    def __post_init__(self):
+        if self.satisfacao_historico is None:
+            self.satisfacao_historico = []
+
     def estoque_para_cliente(self) -> list[dict]:
         return [
             {'nome': ing.nome, 'quantidade': ing.quantidade}
@@ -102,6 +111,10 @@ class SessaoJogo:
             'estoque': self.estoque_para_cliente(),
             'receita': dict(self.receita),
             'finalizado': self.finalizado,
+            'faturamento_total': round(self.faturamento_total, 2),
+            'lucro_liquido_total': round(
+                self.faturamento_total - self.gasto_total, 2
+            ),
             'fator_inflacao': round(fator, 2),
         }
 

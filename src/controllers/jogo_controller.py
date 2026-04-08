@@ -1,9 +1,15 @@
+import os
+
+import jwt as _jwt
 from decorators.error_handler import handle_errors
+from decorators.session_required import session_required
 from flask import jsonify, request
 
 from models.ingrediente import Ingrediente
-from models.sessao_jogo import criar_sessao, obter_sessao, remover_sessao
+from models.sessao_jogo import criar_sessao, remover_sessao
+from services.bairro_service import BairroService
 from services.jogo_service import JogoService
+from services.resultado_service import ResultadoService
 
 
 class JogoController:
@@ -26,6 +32,18 @@ class JogoController:
             )
 
         sessao = criar_sessao(int(id_bairro), str(tempo_de_jogo))
+
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            try:
+                token = auth.split(' ')[1].replace('"', '').strip()
+                payload = _jwt.decode(
+                    token, os.getenv('JWT_KEY'), algorithms=['HS256']
+                )
+                sessao.user_id = payload.get('user_id')
+            except Exception:
+                pass
+
         return (
             jsonify(
                 {
@@ -41,51 +59,36 @@ class JogoController:
 
     @staticmethod
     @handle_errors
-    def estado(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
+    @session_required
+    def estado(sessao):
         return jsonify(sessao.snapshot_publico()), 200
 
     @staticmethod
     @handle_errors
-    def comprar(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-
-        data = request.get_json()
-        nome = (data or {}).get('nome')
+    @session_required
+    def comprar(sessao):
+        nome = (request.get_json() or {}).get('nome')
         if not nome:
             return jsonify({'erro': "'nome' do ingrediente obrigatorio."}), 400
 
         resultado = sessao.comprar_ingrediente(nome)
-        status = 200 if resultado.get('ok') else 422
-        return jsonify(resultado), status
+        return jsonify(resultado), (200 if resultado['ok'] else 422)
 
     @staticmethod
     @handle_errors
-    def devolver(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-
-        data = request.get_json()
-        nome = (data or {}).get('nome')
+    @session_required
+    def devolver(sessao):
+        nome = (request.get_json() or {}).get('nome')
         if not nome:
             return jsonify({'erro': "'nome' do ingrediente obrigatorio."}), 400
 
         resultado = sessao.devolver_ingrediente(nome)
-        status = 200 if resultado.get('ok') else 422
-        return jsonify(resultado), status
+        return jsonify(resultado), (200 if resultado['ok'] else 422)
 
     @staticmethod
     @handle_errors
-    def receita(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-
+    @session_required
+    def receita(sessao):
         data = (request.get_json() or {}).get('receita')
         if not isinstance(data, dict):
             return (
@@ -98,48 +101,33 @@ class JogoController:
         resultado = sessao.atualizar_receita(
             {k: int(v) for k, v in data.items()}
         )
-        status = 200 if resultado.get('ok') else 422
-        return jsonify(resultado), status
+        return jsonify(resultado), (200 if resultado['ok'] else 422)
 
     @staticmethod
     @handle_errors
-    def preco(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-
-        data = request.get_json()
-        valor = (data or {}).get('preco_tapioca')
+    @session_required
+    def preco(sessao):
+        valor = (request.get_json() or {}).get('preco_tapioca')
         if valor is None:
             return jsonify({'erro': "'preco_tapioca' obrigatorio."}), 400
 
         resultado = sessao.definir_preco(float(valor))
-        status = 200 if resultado.get('ok') else 422
-        return jsonify(resultado), status
+        return jsonify(resultado), (200 if resultado['ok'] else 422)
 
     @staticmethod
     @handle_errors
-    def processar_dia(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-
+    @session_required
+    def processar_dia(sessao):
         if sessao.finalizado:
             return jsonify({'erro': 'Sessao ja finalizada.'}), 409
 
         resultado = JogoService.processar_dia(sessao)
-        if 'erro' in resultado:
-            return jsonify(resultado), 422
-
-        return jsonify(resultado), 200
+        return jsonify(resultado), (200 if 'erro' not in resultado else 422)
 
     @staticmethod
     @handle_errors
-    def avancar_dia(sessao_id):
-        sessao = obter_sessao(sessao_id)
-        if not sessao:
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-
+    @session_required
+    def avancar_dia(sessao):
         JogoService.avancar_dia(sessao)
         return (
             jsonify(
@@ -155,8 +143,58 @@ class JogoController:
 
     @staticmethod
     @handle_errors
-    def encerrar(sessao_id):
-        if not obter_sessao(sessao_id):
-            return jsonify({'erro': 'Sessao nao encontrada.'}), 404
-        remover_sessao(sessao_id)
-        return jsonify({'mensagem': 'Sessao encerrada.'}), 200
+    @session_required
+    def encerrar(sessao):
+        resultado_salvo = None
+        if sessao.user_id:
+            bairro = BairroService.buscar_por_id(sessao.id_bairro)
+            nome_bairro = bairro.nome if bairro else 'Desconhecido'
+            hist = sessao.satisfacao_historico or []
+            sat_media = (
+                round(sum(hist) / len(hist), 2)
+                if hist
+                else float(sessao.satisfacao)
+            )
+
+            try:
+                r = ResultadoService.salvar_resultado(
+                    user_id=sessao.user_id,
+                    bairro=nome_bairro,
+                    tempo_de_jogo=sessao.tempo_de_jogo,
+                    dias_jogados=sessao.dia_atual,
+                    faturamento=sessao.faturamento_total,
+                    lucro_liquido=round(
+                        sessao.faturamento_total - sessao.gasto_total, 2
+                    ),
+                    satisfacao_media=sat_media,
+                    satisfacao_final=sessao.satisfacao,
+                )
+                resultado_salvo = r.to_dict()
+            except Exception as e:
+                resultado_salvo = {'erro': str(e)}
+
+        remover_sessao(sessao.sessao_id)
+        return (
+            jsonify(
+                {'mensagem': 'Sessao encerrada.', 'resultado': resultado_salvo}
+            ),
+            200,
+        )
+
+    @staticmethod
+    @handle_errors
+    def historico():
+        auth = request.headers.get('Authorization', '')
+        if not auth.startswith('Bearer '):
+            return jsonify({'erro': 'Token ausente.'}), 401
+        try:
+            token = auth.split(' ')[1].replace('"', '').strip()
+            payload = _jwt.decode(
+                token, os.getenv('JWT_KEY'), algorithms=['HS256']
+            )
+            resultados = ResultadoService.listar_por_usuario(
+                payload['user_id']
+            )
+            return jsonify([r.to_dict() for r in resultados]), 200
+        except Exception:
+            return jsonify({'erro': 'Token invalido ou expirado.'}), 401
