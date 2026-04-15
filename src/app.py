@@ -1,6 +1,7 @@
 import os
 
 from dotenv import load_dotenv
+from flasgger import Swagger
 from flask import Flask
 from flask_cors import CORS
 from routes.bairro_routes import bairro_bp
@@ -28,6 +29,33 @@ CORS(
 )
 
 db.init_app(app)
+
+swagger_config = {
+    'headers': [],
+    'specs': [
+        {
+            'endpoint': 'apispec_1',
+            'route': '/apispec_1.json',
+            'rule_filter': lambda rule: True,  # all in
+            'model_filter': lambda tag: True,  # all in
+        }
+    ],
+    'static_url_path': '/flasgger_static',
+    'swagger_ui': True,
+    'specs_route': '/api-docs/',
+}
+
+swagger = Swagger(
+    app,
+    config=swagger_config,
+    template={
+        'info': {
+            'title': 'API TCC Backend',
+            'description': 'Documentação da API do meu TCC',
+            'version': '1.0.0',
+        }
+    },
+)
 
 app.register_blueprint(usuario_bp, url_prefix='/user')
 app.register_blueprint(bairro_bp, url_prefix='/bairro')
