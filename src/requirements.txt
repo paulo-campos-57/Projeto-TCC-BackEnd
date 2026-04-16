@@ -9,3 +9,4 @@ PyJWT
 ruff
 blue
 flasgger
+pytest

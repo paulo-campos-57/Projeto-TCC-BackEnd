@@ -43,8 +43,7 @@ class BairroService:
             'nome': 'Boa Viagem',
             'pos': [-8.1198, -34.9023],
             'descricao': (
-                'Área nobre à beira-mar, famosa por sua praia e '
-                'comércio movimentado.'
+                'Área nobre à beira-mar, famosa por sua praia e comércio movimentado.'
             ),
             'focoPreco': 'Moderado a Alto',
             'expectativa': 'Saudável e Turística',

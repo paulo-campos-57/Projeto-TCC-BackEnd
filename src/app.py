@@ -67,7 +67,6 @@ app.register_blueprint(bairro_bp, url_prefix='/bairro')
 app.register_blueprint(jogo_bp, url_prefix='/jogo')
 
 with app.app_context():
-
     db.create_all()
     print('Banco de dados verificado/criado com sucesso!')
 
