@@ -36,8 +36,8 @@ swagger_config = {
         {
             'endpoint': 'apispec_1',
             'route': '/apispec_1.json',
-            'rule_filter': lambda rule: True,  # all in
-            'model_filter': lambda tag: True,  # all in
+            'rule_filter': lambda rule: True,
+            'model_filter': lambda tag: True,
         }
     ],
     'static_url_path': '/flasgger_static',
@@ -51,7 +51,12 @@ swagger = Swagger(
     template={
         'info': {
             'title': 'API TCC Backend',
-            'description': 'Documentação da API do meu TCC',
+            'description': 'Documentação da API do TCC App',
+            'contact': {
+                'name': 'Paulo Campos',
+                'email': 'paulo.m.campos6601@gmail.com',
+                'url': 'https://github.com/paulo-campos-57/Projeto-TCC-BackEnd/tree/main',
+            },
             'version': '1.0.0',
         }
     },
