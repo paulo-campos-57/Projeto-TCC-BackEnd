@@ -8,11 +8,14 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
 COPY src/requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN python -m ruff check src
+
+RUN PYTHONPATH=src python -m pytest src
+
 EXPOSE 5000
 
-CMD ["gunicorn", "--chdir", "src", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["python", "-m", "gunicorn", "--chdir", "src", "--bind", "0.0.0.0:5000", "app:app"]

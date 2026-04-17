@@ -24,7 +24,6 @@ services:
       - .env.docker
     ports:
       - "5000:5000"
-    command: gunicorn --chdir src --bind 0.0.0.0:5000 app:app
 
 volumes:
   postgres_data:
