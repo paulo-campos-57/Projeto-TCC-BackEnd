@@ -35,3 +35,38 @@ class ResultadoService:
             .order_by(Resultado.criado_em.desc())
             .all()
         )
+
+    @staticmethod
+    def obter_estatisticas(user_id: str) -> dict:
+        partidas = (
+            Resultado.query.filter_by(user_id=user_id)
+            .order_by(Resultado.criado_em.asc())
+            .all()
+        )
+
+        if not partidas:
+            return None
+
+        total_partidas = len(partidas)
+        lucro_total = sum(p.lucro_liquido for p in partidas)
+
+        labels = [p.criado_em.strftime('%d/%m') for p in partidas]
+        data_lucro = [float(p.lucro_liquido) for p in partidas]
+        data_satisfacao = [float(p.satisfacao_media) for p in partidas]
+
+        return {
+            'geral': {
+                'total_partidas': total_partidas,
+                'lucro_acumulado': float(lucro_total),
+                'media_satisfacao': round(
+                    sum(p.satisfacao_media for p in partidas) / total_partidas,
+                    2,
+                ),
+                'melhor_lucro': float(max(p.lucro_liquido for p in partidas)),
+            },
+            'graficos': {
+                'labels': labels,
+                'lucro_por_partida': data_lucro,
+                'satisfacao_por_partida': data_satisfacao,
+            },
+        }

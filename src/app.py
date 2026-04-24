@@ -6,6 +6,7 @@ from flask import Flask
 from flask_cors import CORS
 from routes.bairro_routes import bairro_bp
 from routes.jogo_routes import jogo_bp
+from routes.resultado_routes import resultado_bp
 from routes.user_routes import usuario_bp
 
 from database import db
@@ -65,6 +66,7 @@ swagger = Swagger(
 app.register_blueprint(usuario_bp, url_prefix='/user')
 app.register_blueprint(bairro_bp, url_prefix='/bairro')
 app.register_blueprint(jogo_bp, url_prefix='/jogo')
+app.register_blueprint(resultado_bp, url_prefix='/resultados')
 
 with app.app_context():
     db.create_all()
