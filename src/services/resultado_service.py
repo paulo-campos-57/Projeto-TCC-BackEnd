@@ -73,7 +73,6 @@ class ResultadoService:
             },
         }
 
-
     @staticmethod
     def obter_ranking(bairro=None, ordenar_por='lucro_liquido') -> list:
         query = Resultado.query
@@ -87,7 +86,9 @@ class ResultadoService:
             'faturamento': Resultado.faturamento,
         }
 
-        coluna_ordenacao = ordenacao_map.get(ordenar_por, Resultado.lucro_liquido)
+        coluna_ordenacao = ordenacao_map.get(
+            ordenar_por, Resultado.lucro_liquido
+        )
 
         rank_results = query.order_by(desc(coluna_ordenacao)).limit(10).all()
 
