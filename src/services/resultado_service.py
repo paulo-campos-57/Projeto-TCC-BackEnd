@@ -1,3 +1,5 @@
+from sqlalchemy import desc
+
 from database import db
 from models.resultado import Resultado
 
@@ -70,3 +72,33 @@ class ResultadoService:
                 'satisfacao_por_partida': data_satisfacao,
             },
         }
+
+
+    @staticmethod
+    def obter_ranking(bairro=None, ordenar_por='lucro_liquido') -> list:
+        query = Resultado.query
+
+        if bairro:
+            query = query.filter(Resultado.bairro == bairro)
+
+        ordenacao_map = {
+            'lucro': Resultado.lucro_liquido,
+            'satisfacao': Resultado.satisfacao_media,
+            'faturamento': Resultado.faturamento,
+        }
+
+        coluna_ordenacao = ordenacao_map.get(ordenar_por, Resultado.lucro_liquido)
+
+        rank_results = query.order_by(desc(coluna_ordenacao)).limit(10).all()
+
+        return [
+            {
+                'posicao': i + 1,
+                'nome': str(r.user_id),
+                'bairro': r.bairro,
+                'lucro': float(r.lucro_liquido),
+                'satisfacao': float(r.satisfacao_media),
+                'data': r.criado_em.strftime('%d/%m/%Y'),
+            }
+            for i, r in enumerate(rank_results)
+        ]
