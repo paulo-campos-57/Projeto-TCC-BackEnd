@@ -51,8 +51,8 @@ swagger = Swagger(
     config=swagger_config,
     template={
         'info': {
-            'title': 'API TCC Backend',
-            'description': 'Documentação da API do TCC App',
+            'title': 'API Tapiocaria Backend',
+            'description': 'Documentação da API do backend do app Tapiocaria',
             'contact': {
                 'name': 'Paulo Campos',
                 'email': 'paulo.m.campos6601@gmail.com',
