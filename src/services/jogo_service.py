@@ -7,16 +7,14 @@ from services.bairro_service import BairroService
 
 class JogoService:
     TOLERANCIA_PRECO = 2
-
     CLIENTES_DIA_MIN = 15
     CLIENTES_DIA_MAX = 40
-
     PESO_PRECO = 0.4
     PESO_RECEITA = 0.6
-
     BONUS_CLIENTES_POR_SAT = 2
-
     ELASTICIDADE_PRECO = 0.7
+
+    LIMITE_PRECO_ABUSIVO = 1.6
 
     @staticmethod
     def processar_dia(sessao: SessaoJogo) -> dict:
@@ -46,14 +44,22 @@ class JogoService:
         )
 
         taxa_preco, taxa_receita = JogoService._taxas_desistencia(
-            delta_preco, delta_receita
+            delta_preco, delta_receita, sessao.preco_tapioca, preco_ideal
         )
-        taxa_total = min(0.9, taxa_preco + taxa_receita)
 
-        clientes_perdidos_preco = round(clientes_totais * taxa_preco)
-        clientes_perdidos_receita = round(clientes_totais * taxa_receita)
+        taxa_total = min(1.0, taxa_preco + taxa_receita)
         clientes_perdidos_total = round(clientes_totais * taxa_total)
-        clientes_interessados = clientes_totais - clientes_perdidos_total
+
+        if taxa_preco >= 1.0:
+            clientes_perdidos_preco = clientes_totais
+            clientes_perdidos_receita = 0
+        else:
+            clientes_perdidos_preco = round(clientes_totais * taxa_preco)
+            clientes_perdidos_receita = round(clientes_totais * taxa_receita)
+
+        clientes_interessados = max(
+            0, clientes_totais - clientes_perdidos_total
+        )
 
         estoque_esgotado = clientes_interessados > estoque_disponivel
         clientes_atendidos = (
@@ -63,7 +69,7 @@ class JogoService:
         for ing in sessao.estoque:
             porcao = sessao.receita.get(ing.nome, 0)
             ing.quantidade = max(
-                0, ing.quantidade - porcao * clientes_atendidos
+                0, ing.quantidade - (porcao * clientes_atendidos)
             )
 
         lucro = round(clientes_atendidos * sessao.preco_tapioca, 2)
@@ -85,6 +91,7 @@ class JogoService:
             estoque_esgotado=estoque_esgotado,
             nome_bairro=bairro.nome,
             preco_ideal=preco_ideal,
+            preco_jogador=sessao.preco_tapioca,
             dia_atual=sessao.dia_atual,
         )
 
@@ -97,8 +104,6 @@ class JogoService:
             'clientes_perdidos_receita': clientes_perdidos_receita,
             'estoque_esgotado': estoque_esgotado,
             'satisfacao_delta': satisfacao_delta,
-            'delta_preco': delta_preco,
-            'delta_receita': delta_receita,
             'mensagem': mensagem,
             'sessao': sessao.snapshot_publico(),
         }
@@ -118,16 +123,12 @@ class JogoService:
 
     @staticmethod
     def _gerar_clientes(
-        preferencia_tapioca: int,
-        satisfacao_atual: int,
-        preco_jogador: float,
-        preco_ideal: float,
+        preferencia_tapioca, satisfacao_atual, preco_jogador, preco_ideal
     ) -> int:
         ratio = preco_ideal / max(preco_jogador, 1.0)
         fator_preco = min(
             1.5, max(0.2, ratio**JogoService.ELASTICIDADE_PRECO)
         )
-
         bonus_tapioca = round(preferencia_tapioca * 1.5)
         bonus_sat = (satisfacao_atual - 5) * JogoService.BONUS_CLIENTES_POR_SAT
 
@@ -149,131 +150,92 @@ class JogoService:
     def _delta_preco(preco_jogador: float, nome_bairro: str) -> int:
         ideal = Ingrediente.preco_ideal(nome_bairro)
         diferenca = preco_jogador - ideal
-
         if abs(diferenca) <= JogoService.TOLERANCIA_PRECO:
             return 0
-
         if diferenca > 0:
             raw = -round(diferenca * 0.5)
         else:
             pct_abaixo = abs(diferenca) / ideal
-            if pct_abaixo <= 0.30:
-                raw = round(abs(diferenca) * 0.3)
-            else:
-                raw = round(3 - (pct_abaixo - 0.30) * 10)
-
+            raw = (
+                round(abs(diferenca) * 0.3)
+                if pct_abaixo <= 0.30
+                else round(3 - (pct_abaixo - 0.30) * 10)
+            )
         return max(-5, min(5, raw))
 
     @staticmethod
-    def _delta_receita(
-        receita_jogador: dict[str, int], nome_bairro: str
-    ) -> int:
+    def _delta_receita(receita_jogador: dict, nome_bairro: str) -> int:
         ideal = Ingrediente.receita_ideal(nome_bairro)
-        ingredientes = list(ideal.keys())
-
         total_ideal = sum(ideal.values()) or 1
-
         distancia = sum(
-            abs((receita_jogador.get(ing, 0)) - ideal.get(ing, 0))
-            for ing in ingredientes
+            abs(receita_jogador.get(ing, 0) - ideal.get(ing, 0))
+            for ing in ideal.keys()
         )
-
         normalizado = min(1.0, distancia / (total_ideal * 2))
         delta = round(5 * (1 - 2 * normalizado))
         return max(-5, min(5, delta))
 
     @staticmethod
-    def _combinar_deltas(delta_preco: int, delta_receita: int) -> int:
+    def _combinar_deltas(delta_p, delta_r) -> int:
         combinado = (
-            delta_preco * JogoService.PESO_PRECO
-            + delta_receita * JogoService.PESO_RECEITA
+            delta_p * JogoService.PESO_PRECO
+            + delta_r * JogoService.PESO_RECEITA
         )
         return max(-10, min(10, round(combinado * 2)))
 
     @staticmethod
-    def _taxas_desistencia(
-        delta_preco: int, delta_receita: int
-    ) -> tuple[float, float]:
-        taxa_preco = (
-            0.0 if delta_preco >= 0 else min(0.5, abs(delta_preco) * 0.06)
-        )
-        taxa_receita = (
-            0.0 if delta_receita >= 0 else min(0.5, abs(delta_receita) * 0.04)
-        )
-        return taxa_preco, taxa_receita
+    def _taxas_desistencia(delta_p, delta_r, p_jog, p_id) -> tuple:
+        if p_jog > (p_id * JogoService.LIMITE_PRECO_ABUSIVO):
+            return 1.0, 0.0
+        taxa_p = 0.0 if delta_p >= 0 else min(0.5, abs(delta_p) * 0.06)
+        taxa_r = 0.0 if delta_r >= 0 else min(0.5, abs(delta_r) * 0.04)
+        return taxa_p, taxa_r
 
     @staticmethod
     def _gerar_mensagem(
-        delta_preco: int,
-        delta_receita: int,
-        satisfacao_delta: int,
-        clientes_atendidos: int,
-        clientes_perdidos_preco: int,
-        clientes_perdidos_receita: int,
-        estoque_esgotado: bool,
-        nome_bairro: str,
-        preco_ideal: float,
-        dia_atual: int,
+        delta_preco,
+        delta_receita,
+        satisfacao_delta,
+        clientes_atendidos,
+        clientes_perdidos_preco,
+        clientes_perdidos_receita,
+        estoque_esgotado,
+        nome_bairro,
+        preco_ideal,
+        preco_jogador,
+        dia_atual,
     ) -> str:
         partes = []
-
-        if delta_preco >= 2:
+        if preco_jogador > (preco_ideal * JogoService.LIMITE_PRECO_ABUSIVO):
             partes.append(
-                f'Preco bem recebido pelos clientes de {nome_bairro} '
-                f'— muitos compraram!'
+                f'Preço abusivo (R${preco_jogador:.2f}) para {nome_bairro}!'
+                ' Ninguém aceitou pagar.'
             )
-        elif delta_preco == 0 or delta_preco == 1:
+        elif delta_preco >= 2:
+            partes.append(f'Preço muito bem aceito em {nome_bairro}!')
+        elif delta_preco < 0:
             partes.append(
-                f'Preco dentro do esperado para o perfil de {nome_bairro}.'
-            )
-        elif delta_preco <= -4:
-            partes.append(
-                f'Preco muito acima do esperado em {nome_bairro}. '
-                f'Varios clientes foram embora.'
-            )
-        elif delta_preco <= -2:
-            partes.append(
-                f'Preco um pouco acima do que os clientes de {nome_bairro} '
-                f'costumam pagar.'
+                f'Clientes de {nome_bairro} acharam o preço salgado.'
             )
         else:
-            partes.append(
-                f'Preco muito abaixo do que o bairro de {nome_bairro} valoriza '
-                f'— o produto pareceu de baixa qualidade.'
-            )
+            partes.append(f'Preço padrão para {nome_bairro}.')
 
-        if delta_receita >= 4:
-            partes.append('A receita foi exatamente o que o bairro queria!')
-        elif delta_receita >= 1:
-            partes.append('A receita foi bem recebida pelo bairro.')
-        elif delta_receita == 0:
-            partes.append('A receita esta proxima do gosto do bairro.')
+        if delta_receita >= 3:
+            partes.append('A receita está incrível!')
+            if clientes_atendidos > 0:
+                partes.append('sucesso absoluto!')
+
+        if clientes_atendidos == 0:
+            partes.append('Nenhuma venda realizada.')
+        elif clientes_atendidos == 1:
+            partes.append('1 venda realizada.')
         else:
-            partes.append(
-                'A receita nao combinou muito com o perfil do bairro — '
-                'experimente os ingredientes sugeridos amanha.'
-            )
-
-        partes.append(f'{clientes_atendidos} vendas realizadas.')
-
-        if clientes_perdidos_preco > 0:
-            partes.append(f'{clientes_perdidos_preco} desistiram pelo preco.')
-        if clientes_perdidos_receita > 0:
-            partes.append(
-                f'{clientes_perdidos_receita} nao gostaram da receita.'
-            )
-
-        fator = Ingrediente.fator_inflacao(dia_atual)
-        if fator > 1.0:
-            partes.append(
-                f'Lembre-se: os insumos estao {round((fator - 1) * 100):.0f}% '
-                f'mais caros do que no inicio do jogo.'
-            )
+            partes.append(f'{clientes_atendidos} vendas realizadas.')
+        if clientes_perdidos_preco > 0 and preco_jogador <= (
+            preco_ideal * JogoService.LIMITE_PRECO_ABUSIVO
+        ):
+            partes.append(f'{clientes_perdidos_preco} desistiram pelo preço.')
 
         if estoque_esgotado:
-            partes.append(
-                'Estoque esgotado antes do fim do dia — '
-                'considere comprar mais ingredientes amanha!'
-            )
-
+            partes.append('Estoque acabou!')
         return ' '.join(partes)

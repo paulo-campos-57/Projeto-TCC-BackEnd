@@ -122,7 +122,11 @@ class JogoController:
             return jsonify({'erro': 'Sessao ja finalizada.'}), 409
 
         resultado = JogoService.processar_dia(sessao)
-        return jsonify(resultado), (200 if 'erro' not in resultado else 422)
+
+        if 'erro' in resultado:
+            return jsonify(resultado), 422
+
+        return jsonify(resultado), 200
 
     @staticmethod
     @handle_errors
