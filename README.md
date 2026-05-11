@@ -39,9 +39,9 @@ Projeto-TCC-BackEnd/
 │   │   ├── sessao_jogo.py    # In-memory game session state
 │   │   └── user.py           # User model
 │   ├── routes/               # Flask blueprints
-│   │   ├── bairro_routes.py  # /bairro
-│   │   ├── jogo_routes.py    # /jogo
-│   │   ├── resultado_routes.py # /usuarios
+│   │   ├── bairro_routes.py  # /neighbourhood
+│   │   ├── jogo_routes.py    # /game
+│   │   ├── resultado_routes.py # /result
 │   │   └── user_routes.py    # /user
 │   ├── services/             # Business logic
 │   │   ├── bairro_service.py
@@ -271,8 +271,8 @@ Projeto-TCC-BackEnd/
 │   ├── routes/               # Blueprints do Flask
 │   │   ├── bairro_routes.py  # /bairro
 │   │   ├── jogo_routes.py    # /jogo
-│   │   ├── resultado_routes.py # /usuarios
-│   │   └── user_routes.py    # /user
+│   │   ├── resultado_routes.py # /resultado
+│   │   └── user_routes.py    # /usuário
 │   ├── services/             # Lógica de negócio
 │   │   ├── bairro_service.py
 │   │   ├── jogo_service.py
