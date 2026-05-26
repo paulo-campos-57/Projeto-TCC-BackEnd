@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: projeto_tcc_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123"
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: projeto_tcc_backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file:
+      - .env.docker
+    ports:
+      - "5000:5000"
+
+volumes:
+  postgres_data:
